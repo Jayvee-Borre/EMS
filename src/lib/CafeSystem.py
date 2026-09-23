@@ -4,7 +4,6 @@ from .MenuController import OrderFlow
 class System:
     def __init__(self):
         self.orderIdTracker = 1001
-        self.orders = []
         self.inventory = []
         self._load_fixed_menu()
         self.flow = OrderFlow(self)

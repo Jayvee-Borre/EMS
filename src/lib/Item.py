@@ -5,14 +5,3 @@ class Item:
         self.description = description
         self.price: int = price
         self.stock: int = quantity
-
-    def getItem(self):
-        return {
-            'id': self.itemID,
-            'item': {
-                'name': self.name,
-                'description': self.description,
-                'quantity': self.stock,
-                'price': self.price
-            }
-        }
