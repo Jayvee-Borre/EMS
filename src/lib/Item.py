@@ -16,6 +16,3 @@ class Item:
                 'price': self.price
             }
         }
-
-    def updateItem(self):
-        pass

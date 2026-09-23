@@ -19,6 +19,3 @@ class Order:
             'status': self.status,
             'amount': self.itemAmount
         }
-
-    def updateOrder(self):
-        pass
