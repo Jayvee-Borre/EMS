@@ -1,347 +1,167 @@
-from .Order import Order
+import time
 from .Customer import Customer
-from .Item import Item
+from .Order import Order
 
-# THIS CLASS IS RESPONSIBLE FOR USER INPUT
-class InputMapper:
+class OrderFlow:
     def __init__(self, system_instance):
-        # Store a reference to the main System to access its lists and trackers
         self.system = system_instance
 
-    def process_input(self, menuInput):
-        match menuInput:
-            case 1: 
-                # Add new Order
-                print(f"{'=' * 17}ADD ORDER{'=' * 18}")
-                print("ENTER 'exit' or 'cancel' to return to menu.")
-                while True: # Outer Loop
-                    orderAmt = input("Input amount of order: ")
-                    if orderAmt.lower() in self.system.exitCmds: return 1
-                    try:
-                        orderAmt = int(orderAmt)
-                        if orderAmt <= 0:
-                            print("Order amount must at least be one")
-                            continue
-                        break
-                    except ValueError:
-                        print("Invalid order amount.")
-                        continue
+    def _display_menu_category(self, categories):
+        print(f"\n{'-'*45}")
+        print(f"{'ID':<4} | {'Item Name':<20} | {'Price':<6} | {'Stock'}")
+        print(f"{'-'*45}")
+        for item in self.system.inventory:
+            if item.description in categories: # Matches the category assigned in CafeSystem
+                print(f"[{item.itemID:02d}] | {item.name:<20} | ₱{item.price:<5} | {item.stock}")
+        print(f"{'-'*45}")
 
-                # Map Order To Person
-                item = firstName = lastName = orderType = None
-                firstName = input("First Name: ")
-                if firstName.lower() in self.system.exitCmds: return 1
-                lastName = input("Last Name: ")
-                if lastName.lower() in self.system.exitCmds: return 1
+    def _get_item_by_input(self, val):
+        for item in self.system.inventory:
+            if str(item.itemID) == val or item.name.lower() == val.lower():
+                return item
+        return None
 
-                # Limit user Response to OTC or ONLINE
-                orderType = None
-                while True:
-                    print("ORDER TYPES ACCEPTED -> [OTC, ONLINE]")
-                    orderType = input("Select Order Type: ")
-                    if orderType.upper() not in self.system.paymentTypes:
-                        print("Invalid Order Type.\n")
-                        continue
-                    elif orderType.lower() in self.system.exitCmds: return 1
-                    else: break    
-
-                # Add a new amount
-                for i in range(orderAmt):
-                    while True:
-                        item = input("Item name: ")
-                        if item.lower() in self.system.exitCmds: return 1
-
-                        matched_item = None
-                        for inv in self.system.inventory:
-                            if inv.name.lower() == item.lower():
-                                matched_item = inv
-                                break
-
-                        # Validate if the item does not exist or there is no stock.
-                        if not matched_item:
-                            print(f"Item '{item}' does not exist.")
-                            continue
-
-                        if matched_item.stock <= 0:
-                            print(f"There is not enough stock of {matched_item.name}")
-                            continue
-
-                        while True:
-                            amount = input("Enter item amount: ")
-                            if amount.lower() in self.system.exitCmds: return 1
-                            try:
-                                amount = int(amount)
-                            except ValueError:
-                                print("Invalid input.")
-                                continue
-
-                            if amount > matched_item.stock:
-                                print("Amount input exceeded amount of current stock.")
-                                continue
-
-                            break
-
-                        order = Order(self.system.orderIdTracker, Customer(firstName, lastName), orderType, matched_item, amount, 'PROCESSING')
-                        self.system.orders.append(order)
-                        self.system.orderIdTracker += 1
-                        matched_item.stock -= amount
-                        print(f"Successfully added order[{self.system.orderIdTracker - 1}] to the database.")
-                        print(f"{'=' * 44}")
-                        break
-                return 1       
+    def _order_loop(self, categories, section_name, current_order_items):
+        while True:
+            self._display_menu_category(categories)
+            choice = input(f"Choose {section_name} by ID or Name (or type 'skip'): ").strip()
             
-            case 2: 
-                # Add stock/inv
-                print(f"{'=' * 13}ADD INVENTORY{'=' * 18}")
-                print("ENTER 'exit' or 'cancel' to return to menu.")
-                while True:
-                    name = input("Item name: ")
-                    if name.lower() in self.system.exitCmds: return 1
-
-                    desc = input("Description: ")
-                    if desc.lower() in self.system.exitCmds: return 1
-
-                    while True:
-                        price = input("Price: ₱")
-                        if price.lower() in self.system.exitCmds: return 1
-
-                        stock = input("Stock: ")
-                        if stock.lower() in self.system.exitCmds: return 1
-                        try:
-                            price = int(price)
-                            stock = int(stock)
-                            break
-                        except ValueError:
-                            print("Please enter a valid number.")
-                            continue
-
-                    item_exists = any(inv_item.name.lower() == name.lower() for inv_item in self.system.inventory)
-
-                    if item_exists:
-                        print("Item already exists, please enter a new one.\n")
-                        continue
-                    else:
-                        item = Item(self.system.itemIdTracker, name, desc, stock, price)
-                        self.system.inventory.append(item)
-                        self.system.itemIdTracker += 1
-                        print(f"Successfully added new item '{item.name}' to inventory")
-                    
-                    return 1
-            case 3: 
-                # Update stock
-                print(f"{'=' * 16}UPDATE STOCK{'=' * 16}")
-                print("ENTER 'exit' or 'cancel' to return to menu.")
-                while True:
-                    search_term = input("Enter Item Name or ID to update: ")
-                    if search_term.lower() in self.system.exitCmds: return 1
-
-                    # Find item in inventory
-                    matched_item = None
-                    for inv in self.system.inventory:
-                        if str(inv.itemID) == search_term or inv.name.lower() == search_term.lower():
-                            matched_item = inv
-                            break
-
-                    if not matched_item:
-                        print("Item not found. Please try again.\n")
-                        continue
-
-                    # Sub-menu for specific updates
-                    while True:
-                        print(f"\n--- Editing: {matched_item.name} (Current Stock: {matched_item.stock} | Price: ₱{matched_item.price}) ---")
-                        print("[1] Add to Stock")
-                        print("[2] Reduce Stock")
-                        print("[3] Set Exact Stock")
-                        print("[4] Update Price")
-                        print("[5] Back to Search")
-                        
-                        sub_menu = input("Select update type: ")
-                        if sub_menu == '1':
-                            try:
-                                amt = int(input("Amount to add: "))
-                                if amt > 0:
-                                    matched_item.stock += amt
-                                    print(f"Success! New stock: {matched_item.stock}")
-                                else:
-                                    print("Amount must be greater than 0.")
-                            except ValueError:
-                                print("Invalid number.")
-                        elif sub_menu == '2':
-                            try:
-                                amt = int(input("Amount to reduce: "))
-                                if 0 < amt <= matched_item.stock:
-                                    matched_item.stock -= amt
-                                    print(f"Success! New stock: {matched_item.stock}")
-                                else:
-                                    print("Invalid amount or exceeds current stock.")
-                            except ValueError:
-                                print("Invalid number.")
-                        elif sub_menu == '3':
-                            try:
-                                amt = int(input("Set exact stock to: "))
-                                if amt >= 0:
-                                    matched_item.stock = amt
-                                    print(f"Success! New stock: {matched_item.stock}")
-                                else:
-                                    print("Stock cannot be negative.")
-                            except ValueError:
-                                print("Invalid number.")
-                        elif sub_menu == '4':
-                            try:
-                                new_price = int(input(f"New price: ₱"))
-                                if new_price >= 0:
-                                    matched_item.price = new_price
-                                    print(f"Success! Price updated to ₱{matched_item.price}")
-                                else:
-                                    print("Price cannot be negative.")
-                            except ValueError:
-                                print("Invalid number.")
-                        elif sub_menu == '5' or sub_menu.lower() in self.system.exitCmds:
-                            break # Break inner loop to search again
-                        else:
-                            print("Invalid option. Please try again.")
-            case 4: 
-                # Update order status
-                print(f"{'=' * 12}UPDATE ORDER STATUS{'=' * 13}")
-                print("ENTER 'exit' or 'cancel' to return to menu.")
-                while True:
-                    search_term = input("Enter Order ID to update: ")
-                    if search_term.lower() in self.system.exitCmds: return 1
-
-                    matched_order = None
-                    for order in self.system.orders:
-                        if str(order.orderID) == search_term:
-                            matched_order = order
-                            break
-
-                    if not matched_order:
-                        print("Order ID not found. Please try again.\n")
-                        continue
-
-                    while True:
-                        print(f"\n--- Editing Order ID: {matched_order.orderID} | Current Status: {matched_order.status} ---")
-                        print("[1] Set status to PROCESSING")
-                        print("[2] Set status to COMPLETED")
-                        print("[3] Set status to CANCELLED")
-                        print("[4] Update Item Amount")
-                        print("[5] Back to Search")
-
-                        sub_menu = input("Select update type: ")
-                        if sub_menu == '1':
-                            matched_order.status = "PROCESSING"
-                            print("Order status updated to PROCESSING.")
-                        elif sub_menu == '2':
-                            matched_order.status = "COMPLETED"
-                            print("Order status updated to COMPLETED.")
-                        elif sub_menu == '3':
-                            if matched_order.status != "CANCELLED":
-                                # Refund the stock back to the inventory item
-                                matched_order.menuItem.stock += matched_order.itemAmount
-                                matched_order.status = "CANCELLED"
-                                print("Order CANCELLED. Stock has been refunded to inventory.")
-                            else:
-                                print("Order is already CANCELLED.")
-                        elif sub_menu == '4':
-                            if matched_order.status in ["COMPLETED", "CANCELLED"]:
-                                print(f"Cannot modify amount because order is {matched_order.status}.")
-                                continue
-                            try:
-                                new_amt = int(input(f"Enter new amount (Current: {matched_order.itemAmount}): "))
-                                if new_amt <= 0:
-                                    print("Amount must be greater than 0.")
-                                    continue
-                                
-                                diff = new_amt - matched_order.itemAmount
-                                if diff > 0: # Adding more items to the order
-                                    if diff > matched_order.menuItem.stock:
-                                        print("Not enough inventory stock to increase order amount.")
-                                    else:
-                                        matched_order.menuItem.stock -= diff
-                                        matched_order.itemAmount = new_amt
-                                        print("Order amount increased successfully.")
-                                elif diff < 0: # Reducing items from the order
-                                    matched_order.menuItem.stock += abs(diff)
-                                    matched_order.itemAmount = new_amt
-                                    print("Order amount decreased. Stock refunded to inventory.")
-                                else:
-                                    print("Amount is unchanged.")
-                            except ValueError:
-                                print("Invalid number.")
-                        elif sub_menu == '5' or sub_menu.lower() in self.system.exitCmds:
-                            break
-                        else:
-                            print("Invalid option. Please try again.")
-            case 5: # View Order
-                print(f"{'=' * 30}ORDERS{'=' * 30}")
-                if len(self.system.orders) > 0:
-                    print(f"{'ID':<5}|{'NAME':<20}|{'TYPE':<10}|{'ITEM':<15}|{'AMOUNT':<8}|{'STATUS'}")
-                    print(f"{'-' * 80}")
-                    for i in range(len(self.system.orders)):
-                        order = self.system.orders[i]
-                        print(f"{order.orderID:<5}" \
-                        f"|{order.customer.getFullName():<20}" \
-                        f"|{order.orderType:<10}" \
-                        f"|{order.menuItem.name:<15}" \
-                        f"|{order.itemAmount:<8}" \
-                        f"|{order.status}")
-                else:
-                    print("No orders in database.\n")
-                print(f"{'=' * 66}\n")
-                return 1
-            case 6: 
-                # View Menu and Prices
-                print(f"{'=' * 15}MENU&PRICES{'=' * 18}")
-                if len(self.system.inventory) == 0:
-                    print("You have no Inventory.\n")
-                else:
-                    print(f"{'NAME':<15}|{'PRICE':<15}")
-                    print(f"{'-' * 44}")
-                    for i in range(len(self.system.inventory)):
-                        item = self.system.inventory[i].getItem()
-                        print(f"{item['item']['name']:<15}|{item['item']['price']}")
-                print(f"{'=' * 42}\n")
-                return 1
-            case 7: 
-                # View Inventory
-                print(f"{'=' * 15}INVENTORY{'=' * 20}")
-                if len(self.system.inventory) == 0:
-                    print("You have no Inventory.\n")
-                else:
-                    print(f"{'ID':<15}|{'NAME':<15}|{'DESCRIPTION':<15}|{'PRICE':<15}|{'QUANTITY':<15}")
-                    print(f"{'-' * 80}")
-                    for i in range(len(self.system.inventory)):
-                        item = self.system.inventory[i].getItem()
-                        print(f"{item['id']:<15}" \
-                            f"|{item['item']['name']:<15}" \
-                            f"|{item['item']['description']:<15}" \
-                            f"|{item['item']['price']:<15}" \
-                            f"|{item['item']['quantity']:<15}")
-                print(f"{'=' * 44}\n")
-                return 1
-            case 8: # View Sales
-                print(f"{'=' * 15}SALES SUMMARY{'=' * 16}")
-                completed_sales = 0
-                processing_sales = 0
-
-                for order in self.system.orders:
-                    # Calculate total value of the current order
-                    order_value = order.menuItem.price * order.itemAmount
-                    
-                    if order.status == 'COMPLETED':
-                        completed_sales += order_value
-                    elif order.status == 'PROCESSING':
-                        processing_sales += order_value
+            if choice.lower() == 'skip' or choice == '':
+                break
                 
-                print(f"Total Completed Sales:   ₱{completed_sales}")
-                print(f"Total Projected Sales:   ₱{processing_sales} (Processing)")
-                print(f"{'-' * 44}")
-                print(f"Total Expected Revenue:  ₱{completed_sales + processing_sales}")
-                print(f"{'=' * 44}\n")
-                return 1
-            case 9: 
-                # Exit
-                return 0 # Changed this to 0 so 'not continueProgram' evaluates to True and breaks the main loop
-            case _: 
-                # Default Case -> Fallback for invalid input
-                print("Invalid input.\n")
-                return 1
+            item = self._get_item_by_input(choice)
+            if not item:
+                print("Invalid selection. Please try again.")
+                continue
+                
+            if item.stock <= 0:
+                print("Out of stock! Please select another.")
+                continue
+                
+            try:
+                qty_input = input(f"Enter quantity for {item.name} (Max {item.stock}): ").strip()
+                if qty_input.lower() == 'skip':
+                    break
+                    
+                qty = int(qty_input)
+                if qty <= 0:
+                    print("Quantity must be at least 1.")
+                    continue
+                if qty > item.stock:
+                    print(f"Not enough stock! Only {item.stock} left.")
+                    continue
+                
+                current_order_items.append((item, qty))
+                print(f"Added {qty}x {item.name}.")
+            except ValueError:
+                print("Invalid quantity.")
+                continue
+                
+            again = input(f"Add Another {section_name}? (Y/N): ").strip().upper()
+            if again != 'Y':
+                break
+
+    def start_sequence(self):
+        # 1. START / WELCOME PAGE
+        print("\n" + "="*45)
+        print("           Welcome to Studio Blend           ")
+        print("="*45)
+        start = input("Press Enter to Start Order (or type 'exit' to quit): ")
+        if start.lower() == 'exit':
+            return False
+            
+        current_order_items = []
+
+        while True:
+            current_order_items.clear()
+            
+            # 2. DRINKS MENU
+            print("\n" + "*"*15 + " DRINKS MENU " + "*"*15)
+            self._order_loop(["Coffee", "Non-coffee", "Frappe"], "Drink", current_order_items)
+
+            # 3. PASTRIES MENU
+            print("\n" + "*"*15 + " PASTRIES MENU " + "*"*13)
+            self._order_loop(["Pastries"], "Pastry", current_order_items)
+
+            if not current_order_items:
+                print("No items ordered. Returning to Start Menu...")
+                return True 
+
+            # 4. CUSTOMER INFORMATION
+            print("\n--- CUSTOMER INFORMATION ---")
+            customer_name = input("Enter Customer Name (First Name only): ").strip()
+            if not customer_name: 
+                customer_name = "Guest"
+
+            # 5. ORDER TYPE
+            print("\n--- ORDER TYPE ---")
+            order_type = ""
+            while True:
+                order_type = input("Select Order Type (DineIn/Takeout): ").strip()
+                if order_type in ["DineIn", "Takeout"]:
+                    break
+                print("Invalid option. Please input exactly 'DineIn' or 'Takeout'.")
+
+            # 6. ORDER SUMMARY
+            print("\n" + "="*45)
+            print(f"ORDER SUMMARY FOR: {customer_name.upper()}")
+            print("="*45)
+            total_price = 0
+            for item, qty in current_order_items:
+                subtotal = item.price * qty
+                total_price += subtotal
+                print(f"{qty}x {item.name:<22} ₱{subtotal}")
+            print(f"-"*45)
+            print(f"TOTAL AMOUNT: ₱{total_price}")
+            
+            confirm = input("\nConfirm Order or Edit Order? (Confirm/Edit/Cancel): ").strip().lower()
+            if confirm == 'edit':
+                print("Restarting order process...")
+                continue 
+            elif confirm == 'cancel':
+                print("Order cancelled. Returning to main screen...")
+                return True
+            else:
+                break 
+
+        # 7. PAYMENT
+        print("\n--- PAYMENT ---")
+        print(f"Total Amount to Pay: ₱{total_price}")
+        print("Available Online Payment Methods:")
+        print("(1) E-Wallet")
+        print("(2) Card")
+        print("(3) Other online payments")
+        
+        while True:
+            pay_method = input("Select payment method (1/2/3): ").strip()
+            if pay_method in ['1', '2', '3']:
+                break
+            print("Invalid payment method.")
+            
+        methods_map = {'1': 'E-Wallet', '2': 'Card', '3': 'Other online payments'}
+        print(f"\nProcessing {methods_map[pay_method]} payment...")
+        time.sleep(1) # Simulates external payment processing delay
+        print("Payment Successful!")
+
+        # Process and deduct stock internally 
+        customer = Customer(customer_name)
+        for item, qty in current_order_items:
+            item.stock -= qty 
+            new_order = Order(self.system.orderIdTracker, customer, order_type, item, qty, "COMPLETED")
+            self.system.orders.append(new_order)
+            
+        # 8. ORDER CONFIRMATION
+        print("\n" + "*"*45)
+        print("              ORDER CONFIRMATION             ")
+        print("*"*45)
+        print(f"Order Number   : #{self.system.orderIdTracker}")
+        print(f"Customer Name  : {customer.getName()}")
+        print(f"Order Type     : {order_type}")
+        print(f"Payment Method : {methods_map[pay_method]}")
+        print(f"Total Amount   : ₱{total_price}")
+        print("Status         : Payment Successful")
+        print("\n         Your order is being prepared.       ")
+        print("*"*45 + "\n")
+        
+        self.system.orderIdTracker += 1
+        return True

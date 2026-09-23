@@ -1,13 +1,9 @@
 class Customer:
-    def __init__(self, firstName, lastName):
+    def __init__(self, firstName):
         self.first = firstName
-        self.last = lastName
 
     def getFirstName(self):
         return self.first
 
-    def getLastName(self):
-        return self.last
-
-    def getFullName(self):
-        return f"{self.first} {self.last}"
+    def getName(self):
+        return self.first

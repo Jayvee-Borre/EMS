@@ -13,9 +13,9 @@ class Order:
     def getOrder(self):
         return {
             'orderID': self.orderID,
-            'customer': self.customer,
+            'customer': self.customer.getName(),
             'orderType': self.orderType,
-            'item': self.item,
+            'item': self.menuItem.name,
             'status': self.status,
             'amount': self.itemAmount
         }
